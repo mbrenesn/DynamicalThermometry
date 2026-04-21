@@ -140,6 +140,115 @@ namespace Utils
   }
 
   /*******************************************************************************/
+  // Solves the continuous Lyapunov equation AX + XA^H = Q
+  // Uses the Bartels-Stewart algoritm to find and return X
+  // Based on scipy's linalg.solve_continuous_lyapunov
+  // Assumes square matrices A and Q.
+  // Arguments:
+  // a: general complex square matrix, left term of the eq
+  // q: general complex square matrix, right term of the eq
+  /*******************************************************************************/
+  MZType solve_continuous_lyapunov(MZType const &a, MZType const &q)
+  {
+    assertm( a.size() == q.size(), "Utils::solve_continuous_lyapunov, matrices don't match size" );
+    
+    MKL_INT len = static_cast<MKL_INT>( std::sqrt( a.size() ) );
+    MKL_INT sdim = 0;
+    double scale;
+    std::vector<double> rwork(2 * len, 0.0);
+    CType alpha(1.0, 0.0);
+    CType beta(0.0, 0.0);
+    CType optim_work;
+    MZType w(len, 0.0);
+    MZType schur_form = a;
+    MZType vs(len * len, 0.0); 
+    MZType q_transformed(len * len, 0.0);
+    MZType buffer(len * len, 0.0);
+    MZType x(len* len, 0.0);
+  
+    // finds the optimal size of the work array
+    MKL_INT info = LAPACKE_zgees_work(LAPACK_ROW_MAJOR,
+                                      'V',
+                                      'N',
+                                      nullptr,
+                                      len,
+                                      &schur_form[0],
+                                      len,
+                                      &sdim,
+                                      &w[0],
+                                      &vs[0],
+                                      len,
+                                      &optim_work,
+                                      -1,
+                                      &rwork[0],
+                                      nullptr);
+  
+    if(info != 0){
+      std::cerr << "Optimal size query for Schur decomposition failed" << std::endl;
+      std::cerr << "Error number: " << info << std::endl;
+      exit(1);
+    }
+  
+    MKL_INT lwork = static_cast<MKL_INT>(optim_work.real());
+    MZType work(lwork, 0.0);
+  
+    // schur decomposition of a into schur form matrix T (schur_form) a = vs * T * vs^H
+    info = LAPACKE_zgees_work(LAPACK_ROW_MAJOR,
+                             'V', 
+                             'N', 
+                             nullptr, 
+                             len, 
+                             &schur_form[0], 
+                             len, 
+                             &sdim,
+                             &w[0], 
+                             &vs[0], 
+                             len, 
+                             &work[0], 
+                             lwork, 
+                             &rwork[0], 
+                             nullptr);
+  
+    if(info != 0){
+      std::cerr << "Schur decomposition failed" << std::endl;
+      std::cerr << "Error number: " << info << std::endl;
+      exit(1);
+    }
+    // \tilde{q} = vs^H * (q * vs)
+    cblas_zgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, len, len, len, &alpha, &q[0], len, &vs[0], len, &beta, &buffer[0], len);
+    cblas_zgemm(CblasRowMajor, CblasConjTrans, CblasNoTrans, len, len, len, &alpha, &vs[0], len, &buffer[0], len, &beta, &q_transformed[0], len);
+      
+    // solves for vs^H * (q * vs) = TY + YT^H
+    info = LAPACKE_ztrsyl(LAPACK_ROW_MAJOR,
+                          'N',
+                          'C',
+                          1,
+                          len,
+                          len,
+                          &schur_form[0],
+                          len,
+                          &schur_form[0],
+                          len,
+                          &q_transformed[0],
+                          len,
+                          &scale);
+    
+    if(info != 0){
+      std::cerr << "Lyapunov solver failed at ztrsyl" << std::endl;
+      std::cerr << "Error number: " << info << std::endl;
+      exit(1);
+    }
+  
+    // the solution for Y could've been scale to help convergence, the right solution requieres to scale Y
+    cblas_zdscal(len, scale, &q_transformed[0], 1);
+    // inverse transform to get X = vs * Y * vs^H
+    cblas_zgemm(CblasRowMajor, CblasNoTrans, CblasConjTrans, len, len, len, &alpha, &q_transformed[0], len, &vs[0], len, &beta, &buffer[0], len);
+    cblas_zgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, len, len, len, &alpha, &vs[0], len, &buffer[0], len, &beta, &x[0], len);
+  
+    return x;
+  }
+
+  /*******************************************************************************/
   // Print matrix. Second argument establishes if printing complex values or not
   /*******************************************************************************/
   void print_mat(MZType &mat,

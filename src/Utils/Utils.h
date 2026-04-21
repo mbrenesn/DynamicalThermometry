@@ -40,6 +40,10 @@ namespace Utils
   MZType partial_trace_rc(MZType &rho,
                           MKL_INT keep,
                           MKL_INT rc);
+
+  MZType solve_continuous_lyapunov(MZType const &a, 
+                                   MZType const &q);
+
   void add(MZType &res,
            CType &prefact,
            MZType const &a,
