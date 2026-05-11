@@ -20,8 +20,8 @@ class RK4
                              MZType &w0,
                              MZType &Q,
                              MZType &v0,
-			     MZType &vh2,
-			     MZType &vh,
+			                       MZType &vh2,
+			                       MZType &vh,
                              MZType &R);
   private:
     void multiply_(MZType &Res, 

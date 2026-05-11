@@ -64,12 +64,12 @@ void RK4::rk4_redfield(double delta_t,
 
 // dw(t)_dt = Qw(t) + Rv(t)
 void RK4::rk4_redfield_twoops(double delta_t,
-                       MZType &w0,
-                       MZType &Q,
-                       MZType &v0,
-		       MZType &vh2,
-		       MZType &vh,
-                       MZType &R)
+                              MZType &w0,
+                              MZType &Q,
+                              MZType &v0,
+		                          MZType &vh2,
+		                          MZType &vh,
+                              MZType &R)
 {
   cblas_zcopy(dim_, &w0[0], 1, &Rho0c1_[0], 1);
   cblas_zcopy(dim_, &w0[0], 1, &Rho0c2_[0], 1);
@@ -108,4 +108,3 @@ void RK4::rk4_redfield_twoops(double delta_t,
   cblas_zaxpy(dim_, &h3, &k3_[0], 1, &w0[0], 1);
   cblas_zaxpy(dim_, &h6, &k4_[0], 1, &w0[0], 1);
 }
-
