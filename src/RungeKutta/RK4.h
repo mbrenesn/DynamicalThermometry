@@ -20,8 +20,8 @@ class RK4
                              MZType &w0,
                              MZType &Q,
                              MZType &v0,
-			                       MZType &vh2,
-			                       MZType &vh,
+                             MZType &vh2,
+                             MZType &vh,
                              MZType &R);
   private:
     void multiply_(MZType &Res, 
@@ -35,8 +35,6 @@ class RK4
     MZType Rho0c1_;
     MZType Rho0c2_;
     MZType Rho0c3_;
-    MZType Rv0_; //buffer to store Rv(t)
-    MZType Rvh2_; //buffer to store Rv(t + h/2)
-    MZType Rvh_; //buffer to store Rv(t + h)
+    MZType buffer_; //buffer to store Rv(t)
 };
 #endif
