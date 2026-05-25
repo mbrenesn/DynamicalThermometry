@@ -1,5 +1,7 @@
 // Redfield calculations
 // Dynamics
+// This driver computes the dynamics of the QFI for a themalising scenario
+// of a bath at inv. temp. beta coupled to a multi-spin probe
 /*******************************************************************************/
 // Single reservoir
 // Phonon mapping with sigma x
@@ -28,6 +30,7 @@ double seconds()
   return sec;
 }
 
+// Same as np.linspace with std::vec
 std::vector<double> linspace(double a, double b, size_t n)
 {
   double h = (b - a) / static_cast<double>(n - 1);
@@ -49,6 +52,20 @@ double ohmic_spectrum(double w, double t)
   double j_s = ga * aw * std::exp(-1.0 * aw / wc);
   
   return (j_s * (n_b + 1.0) * (w > 0)) + (j_s * n_b * (w < 0)) + (ga * t * (w == 0.0));
+}
+
+// Spectral function of the residual baths: derivative with respect to \beta
+// Required to compute the dynamics of the first derivative of the density matrix 
+// with respect to \beta
+double ohmic_spectrum_db(double w, double t)
+{
+  double m_ga = -1.0 * 0.05; // Coupling to the residual reservoir
+  double wc = 1000.0; // Cut-off frequency
+  double aw = std::abs(w);
+  double n_b = 1.0 / (std::exp(aw / t) - (1.0 * (w != 0)));
+  double j_s_w = m_ga * aw * aw * std::exp(-1.0 * aw / wc);
+  
+  return (j_s_w * n_b * (n_b + 1.0) * (w > 0)) + (j_s_w * n_b * (n_b + 1.0) * (w < 0)) + (m_ga * t * t * (w == 0.0));
 }
 
 int main(int argc, char **argv)
@@ -79,7 +96,7 @@ int main(int argc, char **argv)
   }
 
   std::vector< std::complex<double> > eps(Nbits, 1.0); // Local qubit splitting
-  for(MKL_INT i = 0; i < Nbits; ++i) eps[i] = eps[i] - (0.1 * i);
+  for(MKL_INT i = 0; i < Nbits; ++i) eps[i] = eps[i] - (0.05 * i);
 
   std::cout << std::fixed;
   std::cout.precision(5);
@@ -139,6 +156,11 @@ int main(int argc, char **argv)
                           Utils::eye(size_s),
                           Utils::atpa(rc));
  
+  // A copy of the Hamiltonian and interaction Hamiltonian to create the 
+  // derivative of the Redfield tensor with respect to \beta
+  MZType Ham_db = Ham;
+  MZType Vr_db = Vr;
+
   // Redfield tensor
   double time1 = seconds();
   MKL_INT ham_dim = static_cast<MKL_INT>(std::sqrt(Ham.size()));
@@ -154,6 +176,20 @@ int main(int argc, char **argv)
   CType alpha(1.0, 0.0);
   CType beta(0.0, 0.0);
   cblas_zaxpy(Coh.size(), &alpha, &RedR[0], 1, &Coh[0], 1);
+  
+  // Redfield tensor: derivative with respect to \beta
+  time1 = seconds();
+  
+  Redfield redT_db(ham_dim);
+
+  MZType RedR_db((ham_dim * ham_dim) * (ham_dim * ham_dim), 0.0);
+  MZType Coh_db((ham_dim * ham_dim) * (ham_dim * ham_dim), 0.0);
+  redT_db.construct_redfield_1r_phonon(Coh_db, RedR_db, Ham_db, Vr_db, &ohmic_spectrum_db, t_r);
+  time2 = seconds();
+
+  std::cout << "# Time Redfield_db: " << time2 - time1 << std::endl;
+  // Write a superoperator onto Coh_db
+  cblas_zaxpy(Coh_db.size(), &alpha, &RedR_db[0], 1, &Coh_db[0], 1);
 
   // Dynamics
   // Runge Kutta
@@ -165,6 +201,7 @@ int main(int argc, char **argv)
 
   // Initial State
   // For the system, let's just do a 1 on the first entry
+  // We can play with this initial state!
   MZType SysRho(size_s * size_s, 0.0);
   SysRho[0] = 1.0;
 
@@ -183,32 +220,58 @@ int main(int argc, char **argv)
 
   // Initial State is a product state between system and RC
   MZType Rho = Utils::kron(1.0, SysRho, RCRho);
+  
+  // Initial State: derivative with respect to beta
+  MZType HRC = Utils::ata(rc);
+  CType exptH = {0.0, 0.0};
+  for(MKL_INT i = 0; i < rc; ++i){
+    exptH += HRC[(i * rc) + i] * RCRho[(i * rc) + i];
+  }
+
+  MZType RCRho_db(HRC.size(), 0.0);
+  for(MKL_INT i = 0; i < rc; ++i){
+    RCRho_db[(i * rc) + i] = (exptH - HRC[(i * rc) + i]) * RCRho[(i * rc) + i];
+  }
+
+  // Initial State is a product state between system and RC
+  MZType Rho_db = Utils::kron(1.0, SysRho, RCRho_db);
 
   // Time Evo
   double time = 0.0;
   MZType buffer(ham_dim * ham_dim, 0.0);
-  // TO BE DECIDED:
-  // This part of the routine relies on the how we do the QFI calculation
-  // It might not require the partial trace to get the state of the system, but some other calculation
   for(MKL_INT tt = 0; tt < tsteps; ++tt){
   
     MZType RedRho = Utils::partial_trace_rc(Rho, size_s, rc); 
+    MZType RedRho_db = Utils::partial_trace_rc(Rho_db, size_s, rc); 
 
-    // WE WOULD DO QFI CALCULATIONS HERE
+    // SOLVE LYAPUNOV HERE
 
     // Rotate state into eigenbasis of Ham to evolve it
     cblas_zgemm(CblasRowMajor, CblasConjTrans, CblasNoTrans, ham_dim, ham_dim, ham_dim, &alpha,
                 &Ham[0], ham_dim, &Rho[0], ham_dim, &beta, &buffer[0], ham_dim);
     cblas_zgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, ham_dim, ham_dim, ham_dim, &alpha,
                 &buffer[0], ham_dim, &Ham[0], ham_dim, &beta, &Rho[0], ham_dim);  
+    // Rotate state_db into eigenbasis of Ham to evolve it
+    cblas_zgemm(CblasRowMajor, CblasConjTrans, CblasNoTrans, ham_dim, ham_dim, ham_dim, &alpha,
+                &Ham[0], ham_dim, &Rho_db[0], ham_dim, &beta, &buffer[0], ham_dim);
+    cblas_zgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, ham_dim, ham_dim, ham_dim, &alpha,
+                &buffer[0], ham_dim, &Ham[0], ham_dim, &beta, &Rho_db[0], ham_dim);  
     // Now we can evolve
     rk4.rk4_redfield(delta_t, Rho, Coh);
+    //
+    // EVOLVE Rho_db here
+    //
     time += delta_t;
     // We have to rotate the state back to original basis so we can take the partial trace
     cblas_zgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, ham_dim, ham_dim, ham_dim, &alpha,
                 &Ham[0], ham_dim, &Rho[0], ham_dim, &beta, &buffer[0], ham_dim);  
     cblas_zgemm(CblasRowMajor, CblasNoTrans, CblasConjTrans, ham_dim, ham_dim, ham_dim, &alpha,
                 &buffer[0], ham_dim, &Ham[0], ham_dim, &beta, &Rho[0], ham_dim);
+    // We have to rotate the state_db back to original basis so we can take the partial trace
+    cblas_zgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, ham_dim, ham_dim, ham_dim, &alpha,
+                &Ham[0], ham_dim, &Rho_db[0], ham_dim, &beta, &buffer[0], ham_dim);  
+    cblas_zgemm(CblasRowMajor, CblasNoTrans, CblasConjTrans, ham_dim, ham_dim, ham_dim, &alpha,
+                &buffer[0], ham_dim, &Ham[0], ham_dim, &beta, &Rho_db[0], ham_dim);
   }
 
   return 0;
