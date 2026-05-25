@@ -245,6 +245,11 @@ int main(int argc, char **argv)
     MZType RedRho_db = Utils::partial_trace_rc(Rho_db, size_s, rc); 
 
     // SOLVE LYAPUNOV HERE
+    MZType RedRho_db_2 = RedRho_db;
+    cblas_zdscal(RedRho_db_2.size(), 2.0, &RedRho_db_2[0], 1);
+    MZType sld = Utils::solve_continuous_lyapunov(RedRho, RedRho_db_2);
+
+    // We have SLD here, compute SNR or QFI
 
     // Rotate state into eigenbasis of Ham to evolve it
     cblas_zgemm(CblasRowMajor, CblasConjTrans, CblasNoTrans, ham_dim, ham_dim, ham_dim, &alpha,
@@ -257,10 +262,17 @@ int main(int argc, char **argv)
     cblas_zgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, ham_dim, ham_dim, ham_dim, &alpha,
                 &buffer[0], ham_dim, &Ham[0], ham_dim, &beta, &Rho_db[0], ham_dim);  
     // Now we can evolve
-    rk4.rk4_redfield(delta_t, Rho, Coh);
+    // First, a copy of the state in the past
+    MZType Rho_0 = Rho;
+    rk4.rk4_redfield(delta_t / 2.0, Rho, Coh);
+    // Now we have Rho at t + h/2
+    MZType Rho_2 = Rho;
+    rk4.rk4_redfield(delta_t / 2.0, Rho, Coh);
+    // Now Rho is at time t + h 
     //
-    // EVOLVE Rho_db here
-    //
+    // Evolve Rho_db
+    rk4.rk4_redfield_twoops(delta_t, Rho_db, Coh, Rho_0, Rho_2, Rho, Coh_db);
+
     time += delta_t;
     // We have to rotate the state back to original basis so we can take the partial trace
     cblas_zgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, ham_dim, ham_dim, ham_dim, &alpha,
