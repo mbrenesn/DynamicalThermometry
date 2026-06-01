@@ -195,7 +195,7 @@ int main(int argc, char **argv)
   // Runge Kutta
   RK4 rk4(ham_dim * ham_dim);
 
-  std::vector<double> times = linspace(0.0, 50.0, 5001);
+  std::vector<double> times = linspace(0.0, 1.0, 101);
   double delta_t = times[1] - times[0];
   MKL_INT tsteps = times.size();
 
@@ -239,6 +239,8 @@ int main(int argc, char **argv)
   // Time Evo
   double time = 0.0;
   MZType buffer(ham_dim * ham_dim, 0.0);
+  MZType Sld_sq(size_s * size_s, 0.0);
+  MZType RhoSld_sq(size_s * size_s, 0.0);
   for(MKL_INT tt = 0; tt < tsteps; ++tt){
   
     MZType RedRho = Utils::partial_trace_rc(Rho, size_s, rc); 
@@ -247,9 +249,18 @@ int main(int argc, char **argv)
     // SOLVE LYAPUNOV HERE
     MZType RedRho_db_2 = RedRho_db;
     cblas_zdscal(RedRho_db_2.size(), 2.0, &RedRho_db_2[0], 1);
-    MZType sld = Utils::solve_continuous_lyapunov(RedRho, RedRho_db_2);
+    MZType Sld = Utils::solve_continuous_lyapunov(RedRho, RedRho_db_2);
 
-    // We have SLD here, compute SNR or QFI
+    // We have SLD here, compute SNR
+    cblas_zgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, size_s, size_s, size_s, &alpha, &Sld[0], size_s, &Sld[0], size_s, &beta, &Sld_sq[0], size_s);
+    cblas_zgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, size_s, size_s, size_s, &alpha, &RedRho[0], size_s, &Sld_sq[0], size_s, &beta, &RhoSld_sq[0], size_s);
+    // Trace and SNR
+    CType qfi = 0.0;
+    for(MKL_INT i = 0; i < size_s; ++i){
+      qfi += RhoSld_sq[(i * size_s) + i];
+    }
+
+    std::cout << time << " " << (1.0 / t_r) * std::sqrt(qfi) << std::endl; 
 
     // Rotate state into eigenbasis of Ham to evolve it
     cblas_zgemm(CblasRowMajor, CblasConjTrans, CblasNoTrans, ham_dim, ham_dim, ham_dim, &alpha,
