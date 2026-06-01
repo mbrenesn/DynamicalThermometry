@@ -195,7 +195,7 @@ int main(int argc, char **argv)
   // Runge Kutta
   RK4 rk4(ham_dim * ham_dim);
 
-  std::vector<double> times = linspace(0.0, 1.0, 101);
+  std::vector<double> times = linspace(0.0, 3000.0, 300001);
   double delta_t = times[1] - times[0];
   MKL_INT tsteps = times.size();
 
@@ -241,6 +241,7 @@ int main(int argc, char **argv)
   MZType buffer(ham_dim * ham_dim, 0.0);
   MZType Sld_sq(size_s * size_s, 0.0);
   MZType RhoSld_sq(size_s * size_s, 0.0);
+  time1 = seconds();
   for(MKL_INT tt = 0; tt < tsteps; ++tt){
   
     MZType RedRho = Utils::partial_trace_rc(Rho, size_s, rc); 
@@ -260,8 +261,7 @@ int main(int argc, char **argv)
       qfi += RhoSld_sq[(i * size_s) + i];
     }
 
-    std::cout << time << " " << (1.0 / t_r) * std::sqrt(qfi) << std::endl; 
-
+    std::cout << time << " " << (1.0 / t_r) * std::sqrt(std::real(qfi)) << std::endl; 
     // Rotate state into eigenbasis of Ham to evolve it
     cblas_zgemm(CblasRowMajor, CblasConjTrans, CblasNoTrans, ham_dim, ham_dim, ham_dim, &alpha,
                 &Ham[0], ham_dim, &Rho[0], ham_dim, &beta, &buffer[0], ham_dim);
@@ -296,6 +296,8 @@ int main(int argc, char **argv)
     cblas_zgemm(CblasRowMajor, CblasNoTrans, CblasConjTrans, ham_dim, ham_dim, ham_dim, &alpha,
                 &buffer[0], ham_dim, &Ham[0], ham_dim, &beta, &Rho_db[0], ham_dim);
   }
+  time2 = seconds();
+  std::cout << "# Time dynamics: " << time2 - time1 << std::endl;
 
   return 0;
 }
