@@ -46,6 +46,11 @@ void Redfield::construct_redfield_1r_phonon(MZType &Coh,
   // Diagonalise Ham
   eigvals.resize(ham_dim_);
   MKL_INT info = LAPACKE_zheevd(LAPACK_ROW_MAJOR, 'V', 'U', ham_dim_, &Ham[0], ham_dim_, &eigvals[0]);
+  if(info != 0){
+    std::cerr << "Diag failed on Redfield construccion" << std::endl;
+    std::cerr << "Error number: " << info << std::endl;
+    exit(1);
+  }
 
   // Rotate Vr
   CType alpha(1.0, 0.0);
@@ -135,6 +140,11 @@ void Redfield::construct_redfield_2r_phonon(MZType &Coh,
   // Diagonalise Ham
   eigvals.resize(ham_dim_);
   MKL_INT info = LAPACKE_zheevd(LAPACK_ROW_MAJOR, 'V', 'U', ham_dim_, &Ham[0], ham_dim_, &eigvals[0]);
+  if(info != 0){
+    std::cerr << "Diag failed on Redfield construccion" << std::endl;
+    std::cerr << "Error number: " << info << std::endl;
+    exit(1);
+  }
 
   // Rotate Vl
   CType alpha(1.0, 0.0);
@@ -236,6 +246,11 @@ void Redfield::construct_redfield_2r_phonon_sec(MZType &Coh,
   // Diagonalise Ham
   eigvals.resize(ham_dim_);
   MKL_INT info = LAPACKE_zheevd(LAPACK_ROW_MAJOR, 'V', 'U', ham_dim_, &Ham[0], ham_dim_, &eigvals[0]);
+  if(info != 0){
+    std::cerr << "Diag failed on Redfield construccion" << std::endl;
+    std::cerr << "Error number: " << info << std::endl;
+    exit(1);
+  }
   
   // Rotate Vl
   CType alpha(1.0, 0.0);
