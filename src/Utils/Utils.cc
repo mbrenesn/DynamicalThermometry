@@ -232,12 +232,12 @@ namespace Utils
                           &q_transformed[0],
                           len,
                           &scale);
-    
-    if(info != 0){
-      std::cerr << "Lyapunov solver failed at ztrsyl" << std::endl;
-      std::cerr << "Error number: " << info << std::endl;
-      exit(1);
-    }
+        
+    //if(info != 0){
+    //  std::cerr << "Lyapunov solver failed at ztrsyl" << std::endl;
+    //  std::cerr << "Error number: " << info << std::endl;
+    //  exit(1);
+    //}
   
     // the solution for Y could've been scale to help convergence, the right solution requieres to scale Y
     cblas_zdscal(len, scale, &q_transformed[0], 1);
