@@ -74,7 +74,7 @@ int main(int argc, char **argv)
   MKL_INT Nbits = 777; // Number of qubits
   double la = 0.777; // System-Reservoir coupling
   double t_r = 0.777; // Temperature
-  double om_r = 8.0; // Self-energy of the RC
+  double om_r = 15.0; // Self-energy of the RC
 
   // Parsing arguments
   if(argc != 9){
@@ -96,7 +96,7 @@ int main(int argc, char **argv)
   }
 
   std::vector< std::complex<double> > eps(Nbits, 1.0); // Local qubit splitting
-  for(MKL_INT i = 0; i < Nbits; ++i) eps[i] = eps[i] - (0.05 * i);
+  for(MKL_INT i = 0; i < Nbits; ++i) eps[i] = eps[i] - (0.5 * i);
 
   std::cout << std::fixed;
   std::cout.precision(5);
