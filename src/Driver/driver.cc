@@ -30,18 +30,6 @@ double seconds()
   return sec;
 }
 
-// Same as np.linspace with std::vec
-std::vector<double> linspace(double a, double b, size_t n)
-{
-  double h = (b - a) / static_cast<double>(n - 1);
-  std::vector<double> vec(n);
-  typename std::vector<double>::iterator x;
-  double val;
-  for (x = vec.begin(), val = a; x != vec.end(); ++x, val += h)
-    *x = val;
-  return vec;
-}
-
 // Spectral function of the residual baths
 double ohmic_spectrum(double w, double t)
 {
@@ -75,10 +63,11 @@ int main(int argc, char **argv)
   double la = 0.777; // System-Reservoir coupling
   double t_r = 0.777; // Temperature
   double om_r = 15.0; // Self-energy of the RC
+  double t_m = 0.777; // Final time for the evolution
 
   // Parsing arguments
-  if(argc != 9){
-    std::cerr << "Usage: " << argv[0] << " --N [N] --rc [rc] --la [la] --tr [t_h]" << std::endl;
+  if(argc != 11){
+    std::cerr << "Usage: " << argv[0] << " --N [N] --rc [rc] --la [la] --tr [t_h] --tf [t_m]" << std::endl;
     exit(1);
   }
   for(int i = 0; i < argc; ++i){
@@ -87,11 +76,12 @@ int main(int argc, char **argv)
     if(str == "--N") Nbits = atoi(argv[i + 1]);
     if(str == "--la") la = atof(argv[i + 1]);
     if(str == "--tr") t_r = atof(argv[i + 1]);
+    if(str == "--tf") t_m = atof(argv[i + 1]);
     else continue;
   }
-  if(Nbits == 777 || rc == 777 || t_r == 0.777 || la == 0.777){
+  if(Nbits == 777 || rc == 777 || t_r == 0.777 || la == 0.777 || t_m == 0.777){
     std::cerr << "Error setting parameters" << std::endl;
-    std::cerr << "Usage: " << argv[0] << " --N [N] --rc [rc] --la [la] --tr [t_r]" << std::endl;
+    std::cerr << "Usage: " << argv[0] << " --N [N] --rc [rc] --la [la] --tr [t_r] --tf [t_m]" << std::endl;
     exit(1);
   }
 
@@ -106,6 +96,7 @@ int main(int argc, char **argv)
   std::cout << "# om_r = " << om_r << std::endl;
   std::cout << "# t_r = " << t_r << std::endl;
   std::cout << "# ga = 0.05" << std::endl;
+
 
   // NBit Hamiltonian: Hamiltonian of the system alone
   MKL_INT size_s = 1LL << Nbits;
@@ -195,9 +186,8 @@ int main(int argc, char **argv)
   // Runge Kutta
   RK4 rk4(ham_dim * ham_dim);
 
-  std::vector<double> times = linspace(0.0, 3000.0, 300001);
-  double delta_t = times[1] - times[0];
-  MKL_INT tsteps = times.size();
+  double delta_t = 0.01;
+  MKL_INT tsteps = static_cast<MKL_INT>(t_m / delta_t) + 1;
 
   // Initial State
   // For the system, let's just do a 1 on the first entry
