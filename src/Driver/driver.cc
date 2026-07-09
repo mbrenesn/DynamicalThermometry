@@ -251,7 +251,7 @@ int main(int argc, char **argv)
       qfi += RhoSld_sq[(i * size_s) + i];
     }
 
-    std::cout << time << " " << (1.0 / t_r) * std::sqrt(std::real(qfi)) << std::endl; 
+    std::cout << time << " " << (1.0 / t_r) * std::sqrt(std::real(qfi)) << " " << (1.0 / t_r) * std::sqrt(std::real(qfi) / time) << std::endl; 
     // Rotate state into eigenbasis of Ham to evolve it
     cblas_zgemm(CblasRowMajor, CblasConjTrans, CblasNoTrans, ham_dim, ham_dim, ham_dim, &alpha,
                 &Ham[0], ham_dim, &Rho[0], ham_dim, &beta, &buffer[0], ham_dim);
