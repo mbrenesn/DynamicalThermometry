@@ -248,6 +248,73 @@ namespace Utils
     return x;
   }
 
+  MZType solve_continuous_lyapunov_ev(MZType const &a, MZType const &q)
+  {
+    assertm( a.size() == q.size(), "Utils::solve_continuous_lyapunov, matrices don't match size" );
+
+    MKL_INT len = static_cast<MKL_INT>( std::sqrt( a.size() ) );
+
+    std::vector<double> rwork(3 * len - 2, 0.0);
+    std::vector<double> w(len, 0.0);
+    CType alpha(1.0, 0.0);
+    CType beta(0.0, 0.0);
+    CType optim_work;
+    MZType u = a;
+    MZType q_transformed(len * len, 0.0);
+    MZType buffer(len * len, 0.0);
+    MZType x(len* len, 0.0);
+
+    MKL_INT info = LAPACKE_zheev_work(LAPACK_ROW_MAJOR,
+                                    'V',
+                                    'U',
+                                    len,
+                                    &u[0],
+                                    len,
+                                    &w[0],
+                                    &optim_work,
+                                    -1,
+                                    &rwork[0]);
+    if(info != 0){
+      std::cerr << "Optimal size query for EVD failed" << std::endl;
+      std::cerr << "Error number: " << info << std::endl;
+      exit(1);
+    }
+
+    MKL_INT lwork = static_cast<MKL_INT>(optim_work.real());
+    MZType work(lwork, 0.0);
+
+    info = LAPACKE_zheev_work(LAPACK_ROW_MAJOR,
+                              'V',
+                              'U',
+                              len,
+                              &u[0],
+                              len,
+                              &w[0],
+                              &work[0],
+                              lwork,
+                              &rwork[0]);
+    if(info != 0){
+      std::cerr << "EVD failed" << std::endl;
+      std::cerr << "Error number: " << info << std::endl;
+      exit(1);
+    }
+    // transformation \tilde{q} = u^H * (q * u)
+    cblas_zgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, len, len, len, &alpha, &q[0], len, &u[0], len, &beta, &buffer[0], len); //q*u
+    cblas_zgemm(CblasRowMajor, CblasConjTrans, CblasNoTrans, len, len, len, &alpha, &u[0], len, &buffer[0], len, &beta, &q_transformed[0], len); // u^H * (q * u)
+
+    // solves elements wise for \tilde{X} = u^H * (x * u)
+    for (MKL_INT i = 0; i < len; i++){
+      for (MKL_INT j = 0; j < len; j++) x[i * len + j] = q_transformed[i * len + j] / (w[i] + w[j]);
+    }
+
+    // back transformation X = u * (\tilde{X} * u^H)
+    cblas_zgemm(CblasRowMajor, CblasNoTrans, CblasConjTrans, len, len, len, &alpha, &x[0], len, &u[0], len, &beta, &buffer[0], len);
+    cblas_zgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, len, len, len, &alpha, &u[0], len, &buffer[0], len, &beta, &x[0], len);
+
+    return x;
+  }
+
+
   /*******************************************************************************/
   // Print matrix. Second argument establishes if printing complex values or not
   /*******************************************************************************/

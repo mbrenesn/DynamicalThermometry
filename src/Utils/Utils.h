@@ -43,7 +43,9 @@ namespace Utils
 
   MZType solve_continuous_lyapunov(MZType const &a, 
                                    MZType const &q);
-
+  
+  MZType solve_continuous_lyapunov_ev(MZType const &a,
+                                      MZType const &q);
   void add(MZType &res,
            CType &prefact,
            MZType const &a,
