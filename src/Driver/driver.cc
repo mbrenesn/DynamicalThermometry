@@ -33,7 +33,7 @@ double seconds()
 // Spectral function of the residual baths
 double ohmic_spectrum(double w, double t)
 {
-  double ga = 0.05; // Coupling to the residual reservoir
+  double ga = 0.01; // Coupling to the residual reservoir
   double wc = 1000.0; // Cut-off frequency
   double aw = std::abs(w);
   double n_b = 1.0 / (std::exp(aw / t) - (1.0 * (w != 0)));
@@ -47,7 +47,7 @@ double ohmic_spectrum(double w, double t)
 // with respect to \beta
 double ohmic_spectrum_db(double w, double t)
 {
-  double m_ga = -1.0 * 0.05; // Coupling to the residual reservoir
+  double m_ga = -1.0 * 0.01; // Coupling to the residual reservoir
   double wc = 1000.0; // Cut-off frequency
   double aw = std::abs(w);
   double n_b = 1.0 / (std::exp(aw / t) - (1.0 * (w != 0)));
@@ -89,13 +89,13 @@ int main(int argc, char **argv)
   for(MKL_INT i = 0; i < Nbits; ++i) eps[i] = eps[i] - (0.5 * i);
 
   std::cout << std::fixed;
-  std::cout.precision(5);
+  std::cout.precision(15);
   std::cout << "# Parameters:" << std::endl;
   std::cout << "# RC = " << rc << std::endl;
   std::cout << "# la = " << la << std::endl;
   std::cout << "# om_r = " << om_r << std::endl;
   std::cout << "# t_r = " << t_r << std::endl;
-  std::cout << "# ga = 0.05" << std::endl;
+  std::cout << "# ga = 0.01" << std::endl;
 
 
   // NBit Hamiltonian: Hamiltonian of the system alone
@@ -123,7 +123,7 @@ int main(int argc, char **argv)
   MZType null_s(size_s * size_s, 0.0);
   CType dull = {1.0, 0.0};
   for(MKL_INT i = 0; i < Nbits; ++i){
-    Utils::add(Hbits, eps[i], SigmaZ[i], null_s); 
+    Utils::add(Hbits, eps[i], SigmaZ[i], null_s);
   }
 
   // Hamiltonian system + RCs
@@ -167,10 +167,10 @@ int main(int argc, char **argv)
   CType alpha(1.0, 0.0);
   CType beta(0.0, 0.0);
   cblas_zaxpy(Coh.size(), &alpha, &RedR[0], 1, &Coh[0], 1);
-  
+
   // Redfield tensor: derivative with respect to \beta
   time1 = seconds();
-  
+
   Redfield redT_db(ham_dim);
 
   MZType RedR_db((ham_dim * ham_dim) * (ham_dim * ham_dim), 0.0);
@@ -186,7 +186,7 @@ int main(int argc, char **argv)
   // Runge Kutta
   RK4 rk4(ham_dim * ham_dim);
 
-  double delta_t = 0.01;
+  double delta_t = 0.001;
   MKL_INT tsteps = static_cast<MKL_INT>(t_m / delta_t) + 1;
 
   // Initial State
@@ -210,7 +210,7 @@ int main(int argc, char **argv)
 
   // Initial State is a product state between system and RC
   MZType Rho = Utils::kron(1.0, SysRho, RCRho);
-  
+
   // Initial State: derivative with respect to beta
   MZType HRC = Utils::ata(rc);
   CType exptH = {0.0, 0.0};
@@ -233,7 +233,6 @@ int main(int argc, char **argv)
   MZType RhoSld_sq(size_s * size_s, 0.0);
   time1 = seconds();
   for(MKL_INT tt = 0; tt < tsteps; ++tt){
-  
     MZType RedRho = Utils::partial_trace_rc(Rho, size_s, rc); 
     MZType RedRho_db = Utils::partial_trace_rc(Rho_db, size_s, rc); 
 
